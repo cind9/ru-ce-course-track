@@ -3,6 +3,7 @@ import { Flowchart } from "./components/Flowchart";
 import type { PendingOverride } from "./components/CourseSlot";
 import { ElectivesPanel } from "./components/ElectivesPanel";
 import { PlannerPanel } from "./components/PlannerPanel";
+import { ResizeDivider } from "./components/ResizeDivider";
 import { ResizablePanel } from "./components/ResizablePanel";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import type { PlannerSemester, Term } from "./types";
@@ -39,7 +40,6 @@ function App() {
     useState<PendingOverride | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const [plannerWidth, setPlannerWidth] = useState(300);
-  const [flowchartHeight, setFlowchartHeight] = useState(340);
   const [plannerHeight, setPlannerHeight] = useState(280);
   const [electivesHeight, setElectivesHeight] = useState(200);
   const isNarrowLayout = useMediaQuery("(max-width: 1024px)");
@@ -57,10 +57,6 @@ function App() {
     () => Math.round(viewportHeight * 0.72),
     [viewportHeight],
   );
-  const flowchartMaxHeight = useMemo(
-    () => Math.round(viewportHeight * 0.55),
-    [viewportHeight],
-  );
   const plannerMaxHeight = useMemo(
     () =>
       Math.round(viewportHeight * (isNarrowLayout ? 0.45 : 0.62)),
@@ -75,10 +71,6 @@ function App() {
     const cap = isNarrowLayout ? electivesMaxHeightNarrow : electivesMaxHeight;
     setElectivesHeight((h) => Math.min(h, cap));
   }, [electivesMaxHeight, electivesMaxHeightNarrow, isNarrowLayout]);
-
-  useEffect(() => {
-    setFlowchartHeight((h) => Math.min(h, flowchartMaxHeight));
-  }, [flowchartMaxHeight]);
 
   useEffect(() => {
     setPlannerHeight((h) => Math.min(h, plannerMaxHeight));
@@ -276,39 +268,41 @@ function App() {
       >
         {isNarrowLayout ? (
           <>
-            <ResizablePanel
-              edge="bottom"
-              className="app-pane app-pane--flowchart"
-              size={flowchartHeight}
-              minSize={140}
-              maxSize={flowchartMaxHeight}
-              onSizeChange={setFlowchartHeight}
-              resizeLabel="Resize flowchart — drag the bottom edge"
-            >
-              {flowchart}
-            </ResizablePanel>
-            <ResizablePanel
-              edge="bottom"
-              className="planner-panel-wrap app-pane app-pane--planner"
-              size={plannerHeight}
-              minSize={160}
-              maxSize={plannerMaxHeight}
-              onSizeChange={setPlannerHeight}
-              resizeLabel="Resize semester planner — drag the bottom edge"
+            <div className="stacked-pane stacked-pane--flowchart">{flowchart}</div>
+            <ResizeDivider
+              ariaLabel="Resize semester planner height"
+              onResize={(delta) =>
+                setPlannerHeight((h) =>
+                  Math.min(
+                    plannerMaxHeight,
+                    Math.max(160, h + delta),
+                  ),
+                )
+              }
+            />
+            <div
+              className="stacked-pane stacked-pane--planner planner-panel-wrap"
+              style={{ height: plannerHeight }}
             >
               {plannerPanel}
-            </ResizablePanel>
-            <ResizablePanel
-              edge="top"
-              className="electives-panel-wrap app-pane app-pane--electives"
-              size={electivesHeight}
-              minSize={100}
-              maxSize={electivesMaxHeightNarrow}
-              onSizeChange={setElectivesHeight}
-              resizeLabel="Resize CE electives — drag the top edge"
+            </div>
+            <ResizeDivider
+              ariaLabel="Resize CE electives height"
+              onResize={(delta) =>
+                setElectivesHeight((h) =>
+                  Math.min(
+                    electivesMaxHeightNarrow,
+                    Math.max(100, h + delta),
+                  ),
+                )
+              }
+            />
+            <div
+              className="stacked-pane stacked-pane--electives electives-panel-wrap"
+              style={{ height: electivesHeight }}
             >
               <ElectivesPanel />
-            </ResizablePanel>
+            </div>
           </>
         ) : (
           <>
