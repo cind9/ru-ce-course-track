@@ -1,4 +1,4 @@
-# Rutgers CE Track
+# Rutgers CE Degree Planner
 
 Interactive 4-year **Computer Engineering** course flowchart with:
 
@@ -9,19 +9,7 @@ Interactive 4-year **Computer Engineering** course flowchart with:
 
 ## Live site
 
-**[Rutgers CE Track](https://rutgers-ce-track.vercel.app/)**
-
-Hosted on [Vercel](https://vercel.com). The public URL uses the project name `rutgers-ce-track` (not the GitHub repo slug).
-
-### One-time deploy (repo owner)
-
-1. Sign in at [vercel.com](https://vercel.com) with GitHub.
-2. **Add New → Project** → import `cind9/ru-ce-course-track` (or your fork).
-3. Leave defaults: **Framework Preset** Vite, **Build Command** `npm run build`, **Output Directory** `dist`, **Install Command** `npm install`.
-4. Set **Project Name** to `rutgers-ce-track` (this becomes `https://rutgers-ce-track.vercel.app`).
-5. Deploy. Future pushes to `main` redeploy automatically.
-
-`vercel.json` in this repo sets the build output and SPA fallback; no env vars required.
+**https://cind9.github.io/ru-ce-course-track/**
 
 ## Project location
 
