@@ -1,6 +1,6 @@
 # Rutgers CE & EE Track
 
-Interactive 4-year **Computer Engineering** and **Electrical Engineering** flowcharts with semester planning, prerequisites, SOC electives, and saved plans per track.
+Interactive 4-year **Computer Engineering** and **Electrical Engineering** flowcharts with semester planning.
 
 **Live site:** [https://cind9.github.io/ru-ece-course-track/](https://cind9.github.io/ru-ece-course-track/)
 
