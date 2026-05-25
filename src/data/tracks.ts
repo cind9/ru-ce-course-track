@@ -44,7 +44,7 @@ export const TRACKS: Record<DegreeTrack, TrackDefinition> = {
   ce: {
     id: "ce",
     label: "CE",
-    title: "Rutgers CE Track",
+    title: "Rutgers ECE Track",
     subtitle:
       "Computer Engineering (ECE) — 4-year flowchart with semester planning. Your plan saves automatically on this device.",
     flowchartRef:
@@ -77,7 +77,7 @@ export const TRACKS: Record<DegreeTrack, TrackDefinition> = {
   ee: {
     id: "ee",
     label: "EE",
-    title: "Rutgers EE Track",
+    title: "Rutgers ECE Track",
     subtitle:
       "Electrical Engineering (ECE) — 4-year flowchart with semester planning. Your plan saves automatically on this device.",
     flowchartRef:
