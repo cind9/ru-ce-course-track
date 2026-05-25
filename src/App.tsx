@@ -4,21 +4,19 @@ import type { PendingOverride } from "./components/CourseSlot";
 import { ElectivesPanel } from "./components/ElectivesPanel";
 import { PlannerPanel } from "./components/PlannerPanel";
 import { ResizablePanel } from "./components/ResizablePanel";
+import { TrackProvider } from "./context/TrackContext";
+import type { DegreeTrack } from "./data/tracks";
+import { getTrack, TRACK_ORDER } from "./data/tracks";
 import type { PlannerSemester, Term } from "./types";
 import {
-  allChosenIds,
-  allPlannedSlotIds,
-  completedIdsFromSlots,
-  formatPrereqError,
-  getUnmetPrereqs,
-  isSlotOverridden,
-  plannedSlotIdSet,
-} from "./utils/planner";
-import {
   defaultPersistedPlan,
+  loadActiveTrack,
   loadPersistedPlan,
+  saveActiveTrack,
   savePersistedPlan,
+  type PersistedPlan,
 } from "./utils/planStorage";
+import { useTrackContext } from "./context/TrackContext";
 import "./App.css";
 
 function newSemester(name: string, term: Term = "fall"): PlannerSemester {
@@ -30,11 +28,16 @@ function newSemester(name: string, term: Term = "fall"): PlannerSemester {
   };
 }
 
-function App() {
-  const initialPlan = useMemo(
-    () => loadPersistedPlan() ?? defaultPersistedPlan(),
-    [],
-  );
+function AppContent({
+  degreeTrack,
+  onDegreeTrackChange,
+  initialPlan,
+}: {
+  degreeTrack: DegreeTrack;
+  onDegreeTrackChange: (track: DegreeTrack) => void;
+  initialPlan: PersistedPlan;
+}) {
+  const { track, planner } = useTrackContext();
   const [semesters, setSemesters] = useState<PlannerSemester[]>(
     initialPlan.semesters,
   );
@@ -85,53 +88,58 @@ function App() {
     setPlannerWidth((w) => Math.min(w, plannerMaxWidth));
   }, [plannerMaxWidth]);
 
-  useEffect(() => {
-    const save = () => {
-      savePersistedPlan({
-        version: 1,
-        semesters,
-        activeSemesterId,
-        availableTerm,
-        plannerWidth,
-        electivesHeight,
-      });
-    };
+  const currentPlan = useMemo(
+    (): PersistedPlan => ({
+      version: 2,
+      semesters,
+      activeSemesterId,
+      availableTerm,
+      plannerWidth,
+      electivesHeight,
+    }),
+    [
+      semesters,
+      activeSemesterId,
+      availableTerm,
+      plannerWidth,
+      electivesHeight,
+    ],
+  );
 
+  useEffect(() => {
+    const save = () => savePersistedPlan(degreeTrack, currentPlan);
     const timer = window.setTimeout(save, 250);
     window.addEventListener("beforeunload", save);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("beforeunload", save);
     };
-  }, [
-    semesters,
-    activeSemesterId,
-    availableTerm,
-    plannerWidth,
-    electivesHeight,
-  ]);
+  }, [degreeTrack, currentPlan]);
 
   const plannedSlotIds = useMemo(
-    () => plannedSlotIdSet(semesters),
-    [semesters],
+    () => planner.plannedSlotIdSet(semesters),
+    [planner, semesters],
   );
   const activePlannedSlotIds = useMemo(() => {
     const active = semesters.find((s) => s.id === activeSemesterId);
     return new Set(active?.slots.map((s) => s.slotId) ?? []);
   }, [semesters, activeSemesterId]);
   const completedIds = useMemo(
-    () => completedIdsFromSlots(semesters),
-    [semesters],
+    () => planner.completedIdsFromSlots(semesters),
+    [planner, semesters],
   );
-  const chosenIdsList = useMemo(() => allChosenIds(semesters), [semesters]);
+  const chosenIdsList = useMemo(
+    () => planner.allChosenIds(semesters),
+    [planner, semesters],
+  );
 
   const overriddenSlotIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const slotId of allPlannedSlotIds(semesters)) {
-      if (isSlotOverridden(semesters, slotId)) ids.add(slotId);
+    for (const slotId of planner.allPlannedSlotIds(semesters)) {
+      if (planner.isSlotOverridden(semesters, slotId)) ids.add(slotId);
     }
     return ids;
-  }, [semesters]);
+  }, [planner, semesters]);
 
   const addSlotToActiveSemester = useCallback(
     (slotId: string, chosenId: string, overridden = false) => {
@@ -178,13 +186,13 @@ function App() {
         return;
       }
 
-      const missing = getUnmetPrereqs(chosenId, completedIds);
+      const missing = planner.getUnmetPrereqs(chosenId, completedIds);
       if (missing.length === 0) {
         addSlotToActiveSemester(slotId, chosenId, false);
         return;
       }
 
-      setAddError(formatPrereqError(missing));
+      setAddError(planner.formatPrereqError(missing));
       setPendingOverride({ slotId, chosenId });
     },
     [
@@ -194,6 +202,7 @@ function App() {
       addSlotToActiveSemester,
       removeSlotFromActiveSemester,
       plannedSlotIds,
+      planner,
     ],
   );
 
@@ -252,56 +261,50 @@ function App() {
     });
   };
 
-  const flowchart = (
-    <Flowchart
-      hoveredId={hoveredId}
-      plannedSlotIds={plannedSlotIds}
-      activePlannedSlotIds={activePlannedSlotIds}
-      overriddenSlotIds={overriddenSlotIds}
-      completedIds={completedIds}
-      pendingOverride={pendingOverride}
-      addError={addError}
-      onHover={setHoveredId}
-      onRequestSlot={requestSlot}
-      onConfirmOverride={confirmOverride}
-      onCancelOverride={cancelOverride}
-    />
-  );
-
-  const plannerPanel = (
-    <PlannerPanel
-      semesters={semesters}
-      activeSemesterId={activeSemesterId}
-      onActiveChange={setActiveSemesterId}
-      onAddSemester={addSemester}
-      onRemoveSemester={removeSemester}
-      onRenameSemester={(id, name) =>
-        setSemesters((prev) =>
-          prev.map((s) => (s.id === id ? { ...s, name } : s)),
-        )
-      }
-      onRemoveSlotFromSemester={removeSlotFromSemester}
-      onReorderSemesters={reorderSemesters}
-      availableTerm={availableTerm}
-      onAvailableTermChange={setAvailableTerm}
-      allChosenIds={chosenIdsList}
-      plannedSlotIds={plannedSlotIds}
-    />
-  );
-
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Rutgers CE Track</h1>
-        <p className="subtitle">
-          Computer Engineering (ECE) — 4-year flowchart with semester planning.
-          Your plan saves automatically on this device.
+        <div className="app-header-top">
+          <h1>{track.title}</h1>
+          <div className="degree-tabs" role="tablist" aria-label="Degree track">
+            {TRACK_ORDER.map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={degreeTrack === id}
+                className={`degree-tab${degreeTrack === id ? " degree-tab--active" : ""}`}
+                onClick={() => onDegreeTrackChange(id)}
+              >
+                {getTrack(id).label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="subtitle">{track.subtitle}</p>
+        <p className="flowchart-ref">
+          Official flowchart:{" "}
+          <a href={track.flowchartRef} target="_blank" rel="noreferrer">
+            Rutgers ECE {track.label} curriculum
+          </a>
         </p>
       </header>
 
       <main className="app-main">
         <div className="app-main-center">
-          {flowchart}
+          <Flowchart
+            hoveredId={hoveredId}
+            plannedSlotIds={plannedSlotIds}
+            activePlannedSlotIds={activePlannedSlotIds}
+            overriddenSlotIds={overriddenSlotIds}
+            completedIds={completedIds}
+            pendingOverride={pendingOverride}
+            addError={addError}
+            onHover={setHoveredId}
+            onRequestSlot={requestSlot}
+            onConfirmOverride={confirmOverride}
+            onCancelOverride={cancelOverride}
+          />
           <ResizablePanel
             edge="left"
             className="planner-panel-wrap"
@@ -311,7 +314,24 @@ function App() {
             onSizeChange={setPlannerWidth}
             resizeLabel="Resize semester planner — drag the left edge"
           >
-            {plannerPanel}
+            <PlannerPanel
+              semesters={semesters}
+              activeSemesterId={activeSemesterId}
+              onActiveChange={setActiveSemesterId}
+              onAddSemester={addSemester}
+              onRemoveSemester={removeSemester}
+              onRenameSemester={(id, name) =>
+                setSemesters((prev) =>
+                  prev.map((s) => (s.id === id ? { ...s, name } : s)),
+                )
+              }
+              onRemoveSlotFromSemester={removeSlotFromSemester}
+              onReorderSemesters={reorderSemesters}
+              availableTerm={availableTerm}
+              onAvailableTermChange={setAvailableTerm}
+              allChosenIds={chosenIdsList}
+              plannedSlotIds={plannedSlotIds}
+            />
           </ResizablePanel>
         </div>
         <ResizablePanel
@@ -321,12 +341,38 @@ function App() {
           minSize={100}
           maxSize={electivesMaxHeight}
           onSizeChange={setElectivesHeight}
-          resizeLabel="Resize CE electives — drag the top edge"
+          resizeLabel={`Resize ${track.electives.panelTitle} — drag the top edge`}
         >
           <ElectivesPanel />
         </ResizablePanel>
       </main>
     </div>
+  );
+}
+
+function App() {
+  const [degreeTrack, setDegreeTrack] = useState<DegreeTrack>(() =>
+    loadActiveTrack(),
+  );
+
+  const handleDegreeTrackChange = (next: DegreeTrack) => {
+    if (next === degreeTrack) return;
+    saveActiveTrack(next);
+    setDegreeTrack(next);
+  };
+
+  const initialPlan =
+    loadPersistedPlan(degreeTrack) ?? defaultPersistedPlan();
+
+  return (
+    <TrackProvider track={getTrack(degreeTrack)}>
+      <AppContent
+        key={degreeTrack}
+        degreeTrack={degreeTrack}
+        onDegreeTrackChange={handleDegreeTrackChange}
+        initialPlan={initialPlan}
+      />
+    </TrackProvider>
   );
 }
 

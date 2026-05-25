@@ -1,6 +1,6 @@
 /** Official lists: ece.rutgers.edu/computer-engineering-electives & technical-electives */
 
-export type ElectiveKind = "computer" | "technical" | "restricted";
+export type ElectiveKind = "computer" | "technical" | "restricted" | "electrical";
 
 export interface SocTopicEntry {
   code: string;

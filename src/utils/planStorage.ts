@@ -1,8 +1,11 @@
-import { courseMap } from "../data/courses";
+import type { DegreeTrack } from "../data/tracks";
+import { getTrack } from "../data/tracks";
 import type { PlannerSemester, Term } from "../types";
 
-const STORAGE_KEY = "ru-ce-course-track-plan";
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
+const LEGACY_KEY = "ru-ce-course-track-plan";
+const planKey = (track: DegreeTrack) => `ru-ce-course-track-plan-${track}`;
+const TRACK_KEY = "ru-ce-course-track-active";
 
 export interface PersistedPlan {
   version: number;
@@ -52,7 +55,15 @@ function isTerm(value: unknown): value is Term {
   return value === "fall" || value === "spring";
 }
 
-function sanitizeSemesters(raw: unknown): PlannerSemester[] | null {
+function isDegreeTrack(value: unknown): value is DegreeTrack {
+  return value === "ce" || value === "ee";
+}
+
+function sanitizeSemesters(
+  raw: unknown,
+  track: DegreeTrack,
+): PlannerSemester[] | null {
+  const courseMap = getTrack(track).catalog.courseMap;
   if (!Array.isArray(raw) || raw.length === 0) return null;
 
   const semesters: PlannerSemester[] = [];
@@ -93,51 +104,96 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
   return Math.min(max, Math.max(min, Math.round(value)));
 }
 
-export function loadPersistedPlan(): PersistedPlan | null {
+function parsePlan(data: Record<string, unknown>, track: DegreeTrack): PersistedPlan | null {
+  const semesters = sanitizeSemesters(data.semesters, track);
+  if (!semesters) return null;
+
+  const activeRaw =
+    typeof data.activeSemesterId === "string"
+      ? data.activeSemesterId
+      : semesters[0].id;
+  const activeSemesterId = semesters.some((s) => s.id === activeRaw)
+    ? activeRaw
+    : semesters[0].id;
+
+  const defaults = defaultPersistedPlan();
+
+  return {
+    version: STORAGE_VERSION,
+    semesters,
+    activeSemesterId,
+    availableTerm: isTerm(data.availableTerm)
+      ? data.availableTerm
+      : defaults.availableTerm,
+    plannerWidth: clampNumber(data.plannerWidth, 220, 560, defaults.plannerWidth),
+    electivesHeight: clampNumber(
+      data.electivesHeight,
+      100,
+      800,
+      defaults.electivesHeight,
+    ),
+  };
+}
+
+function migrateLegacyCePlan(): PersistedPlan | null {
   if (typeof window === "undefined") return null;
-
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(LEGACY_KEY);
     if (!raw) return null;
-
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return null;
-
-    const data = parsed as Record<string, unknown>;
-    const semesters = sanitizeSemesters(data.semesters);
-    if (!semesters) return null;
-
-    const activeRaw =
-      typeof data.activeSemesterId === "string"
-        ? data.activeSemesterId
-        : semesters[0].id;
-    const activeSemesterId = semesters.some((s) => s.id === activeRaw)
-      ? activeRaw
-      : semesters[0].id;
-
-    const defaults = defaultPersistedPlan();
-
-    return {
-      version: STORAGE_VERSION,
-      semesters,
-      activeSemesterId,
-      availableTerm: isTerm(data.availableTerm)
-        ? data.availableTerm
-        : defaults.availableTerm,
-      plannerWidth: clampNumber(data.plannerWidth, 220, 560, defaults.plannerWidth),
-      electivesHeight: clampNumber(
-        data.electivesHeight,
-        100,
-        800,
-        defaults.electivesHeight,
-      ),
-    };
+    const plan = parsePlan(parsed as Record<string, unknown>, "ce");
+    if (plan) {
+      window.localStorage.setItem(planKey("ce"), JSON.stringify(plan));
+      window.localStorage.removeItem(LEGACY_KEY);
+    }
+    return plan;
   } catch {
     return null;
   }
 }
 
-export function savePersistedPlan(plan: PersistedPlan): void {
+export function loadActiveTrack(): DegreeTrack {
+  if (typeof window === "undefined") return "ce";
+  try {
+    const raw = window.localStorage.getItem(TRACK_KEY);
+    return isDegreeTrack(raw) ? raw : "ce";
+  } catch {
+    return "ce";
+  }
+}
+
+export function saveActiveTrack(track: DegreeTrack): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(TRACK_KEY, track);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadPersistedPlan(track: DegreeTrack): PersistedPlan | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    let raw = window.localStorage.getItem(planKey(track));
+    if (!raw && track === "ce") {
+      const legacy = migrateLegacyCePlan();
+      if (legacy) return legacy;
+      raw = window.localStorage.getItem(planKey("ce"));
+    }
+    if (!raw) return null;
+
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+
+    return parsePlan(parsed as Record<string, unknown>, track);
+  } catch {
+    return null;
+  }
+}
+
+export function savePersistedPlan(track: DegreeTrack, plan: PersistedPlan): void {
   if (typeof window === "undefined") return;
 
   try {
@@ -145,7 +201,7 @@ export function savePersistedPlan(plan: PersistedPlan): void {
       ...plan,
       version: STORAGE_VERSION,
     };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(planKey(track), JSON.stringify(payload));
   } catch {
     /* quota exceeded or private mode */
   }

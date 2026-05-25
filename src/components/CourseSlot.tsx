@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Course } from "../types";
-import { getUnmetPrereqs } from "../utils/planner";
+import { useTrackContext } from "../context/TrackContext";
 
 export interface PendingOverride {
   slotId: string;
@@ -40,6 +40,7 @@ export function CourseSlot({
   onConfirmOverride,
   onCancelOverride,
 }: CourseSlotProps) {
+  const { planner } = useTrackContext();
   const slotRef = useRef<HTMLDivElement>(null);
   const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(
     null,
@@ -51,7 +52,7 @@ export function CourseSlot({
     pendingOverride?.slotId === slotId && pendingOverride !== null;
 
   const missingForPending = showOverridePopup
-    ? getUnmetPrereqs(pendingOverride.chosenId, completedIds)
+    ? planner.getUnmetPrereqs(pendingOverride.chosenId, completedIds)
     : [];
 
   useLayoutEffect(() => {
@@ -133,7 +134,7 @@ export function CourseSlot({
         {halves.map((course) => {
           const notReady =
             !slotPlanned &&
-            getUnmetPrereqs(course.id, completedIds).length > 0;
+            planner.getUnmetPrereqs(course.id, completedIds).length > 0;
           const isHovered = hoveredId === course.id;
           const isSiblingDim =
             halves.length > 1 && slotHasHover && !isHovered;

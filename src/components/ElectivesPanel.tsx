@@ -1,17 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAutoHideScrollbar } from "../hooks/useAutoHideScrollbar";
+import { useTrackContext } from "../context/TrackContext";
 import {
-  computerElectives,
   socOfferingsSnapshot,
-  technicalElectives,
   type ElectiveOption,
   type SocTopicEntry,
 } from "../data/electives";
-import {
-  fetchEce332Offerings,
-  getTopicSections,
-  type SocCourse,
-} from "../utils/fetchSoc";
+import { fetchEce332Offerings, type SocCourse } from "../utils/fetchSoc";
 
 type SocTerm = "fall2025" | "spring2026" | "fall2026" | "live";
 
@@ -86,6 +81,9 @@ function ElectiveGroup({
 }
 
 export function ElectivesPanel() {
+  const { track } = useTrackContext();
+  const electivesConfig = track.electives;
+
   const [socTerm, setSocTerm] = useState<SocTerm>("fall2026");
   const [liveCourses, setLiveCourses] = useState<SocCourse[] | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
@@ -110,32 +108,24 @@ export function ElectivesPanel() {
   }, [socTerm]);
 
   const topics: SocTopicEntry[] =
-    socTerm === "fall2025"
-      ? [...socOfferingsSnapshot.topicsFall2025]
-      : socTerm === "fall2026"
-        ? [...socOfferingsSnapshot.topicsFall2026]
-        : socTerm === "spring2026"
-          ? [...socOfferingsSnapshot.topicsSpring2026]
-          : (liveCourses ?? [])
-            .filter((c) =>
-              ["435", "445", "446", "493", "494"].includes(c.courseNumber),
-            )
-            .flatMap((c) => getTopicSections(c));
+    socTerm === "live"
+      ? electivesConfig.topicsFromLive(liveCourses ?? [])
+      : electivesConfig.topicsFromSnapshot(socTerm);
 
   return (
     <section className="electives-panel">
       <div className="electives-panel-toolbar">
         <div className="electives-panel-header">
-          <h3>CE electives</h3>
+          <h3>{electivesConfig.panelTitle}</h3>
         </div>
         <p className="elective-intro">
           Approved lists from{" "}
           <a
-            href="https://www.ece.rutgers.edu/computer-engineering-electives"
+            href={electivesConfig.deptLink}
             target="_blank"
             rel="noreferrer"
           >
-            ECE
+            {electivesConfig.deptLinkLabel}
           </a>
           . Offerings from{" "}
           <a
@@ -169,18 +159,15 @@ export function ElectivesPanel() {
         ref={electivesScrollRef}
         className="electives-panel-scroll auto-hide-scrollbar"
       >
-        <ElectiveGroup
-          title="Computer electives (pick 2)"
-          items={computerElectives}
-          socTerm={socTerm}
-          liveCourses={liveCourses ?? undefined}
-        />
-        <ElectiveGroup
-          title="Technical electives (pick 1)"
-          items={technicalElectives}
-          socTerm={socTerm}
-          liveCourses={liveCourses ?? undefined}
-        />
+        {electivesConfig.groups.map((group) => (
+          <ElectiveGroup
+            key={group.title}
+            title={group.title}
+            items={group.items}
+            socTerm={socTerm}
+            liveCourses={liveCourses ?? undefined}
+          />
+        ))}
 
         {topics.length > 0 && (
           <div className="elective-group">

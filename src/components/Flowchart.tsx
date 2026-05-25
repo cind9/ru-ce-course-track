@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAutoHideScrollbar } from "../hooks/useAutoHideScrollbar";
-import {
-  edgeKey,
-  getHighlightedEdgeKeys,
-  getUnlockCourseIds,
-  getPrereqEdges,
-  groupCoursesByRow,
-} from "../data/courses";
+import { useTrackContext } from "../context/TrackContext";
 import { CourseSlot, type PendingOverride } from "./CourseSlot";
 
 const YEARS = [1, 2, 3, 4] as const;
@@ -78,6 +72,15 @@ export function Flowchart({
   onConfirmOverride,
   onCancelOverride,
 }: FlowchartProps) {
+  const { track } = useTrackContext();
+  const {
+    edgeKey,
+    getHighlightedEdgeKeys,
+    getUnlockCourseIds,
+    getPrereqEdges,
+    groupCoursesByRow,
+  } = track.catalog;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomContentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useAutoHideScrollbar<HTMLDivElement>();

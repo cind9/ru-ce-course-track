@@ -1,12 +1,7 @@
 import { useState } from "react";
 import { useAutoHideScrollbar } from "../hooks/useAutoHideScrollbar";
-import { courseMap } from "../data/courses";
+import { useTrackContext } from "../context/TrackContext";
 import type { PlannerSemester, Term } from "../types";
-import {
-  ECE_RESIDENCY_REQUIRED,
-  getAvailableCourses,
-  sumCredits,
-} from "../utils/planner";
 
 interface PlannerPanelProps {
   semesters: PlannerSemester[];
@@ -37,12 +32,16 @@ export function PlannerPanel({
   allChosenIds,
   plannedSlotIds,
 }: PlannerPanelProps) {
+  const { planner } = useTrackContext();
+  const { courseMap } = useTrackContext().track.catalog;
+  const residencyRequired = planner.residencyRequired;
+
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const panelScrollRef = useAutoHideScrollbar<HTMLElement>();
 
-  const globalTotals = sumCredits(allChosenIds);
-  const available = getAvailableCourses(
+  const globalTotals = planner.sumCredits(allChosenIds);
+  const available = planner.getAvailableCourses(
     new Set(allChosenIds),
     plannedSlotIds,
     availableTerm,
@@ -95,7 +94,7 @@ export function PlannerPanel({
         {semesters.map((sem, index) => {
           const isActive = sem.id === activeSemesterId;
           const chosen = sem.slots.map((s) => s.chosenId);
-          const boxTotals = sumCredits(chosen);
+          const boxTotals = planner.sumCredits(chosen);
           const isDragging = dragIndex === index;
           const isDropTarget =
             dropIndex === index && dragIndex !== null && dragIndex !== index;
@@ -197,7 +196,7 @@ export function PlannerPanel({
                       {boxTotals.residency} ECE residency credit
                       {boxTotals.residency === 1 ? "" : "s"} this semester
                     </span>
-                    {boxTotals.residency >= ECE_RESIDENCY_REQUIRED && (
+                    {boxTotals.residency >= residencyRequired && (
                       <span className="residency-met"> · requirement met</span>
                     )}
                   </span>
@@ -216,13 +215,13 @@ export function PlannerPanel({
         <p className="global-residency">
           <span className="planner-residency-tag">ECE residency</span>{" "}
           <strong className="residency-count">{globalTotals.residency}</strong> of{" "}
-          <strong className="residency-count">{ECE_RESIDENCY_REQUIRED}</strong>{" "}
+          <strong className="residency-count">{residencyRequired}</strong>{" "}
           credits required
-          {globalTotals.residency >= ECE_RESIDENCY_REQUIRED ? (
+          {globalTotals.residency >= residencyRequired ? (
             <span className="residency-met-badge">Requirement met</span>
           ) : (
             <span className="residency-remaining">
-              ({ECE_RESIDENCY_REQUIRED - globalTotals.residency} credits still
+              ({residencyRequired - globalTotals.residency} credits still
               needed)
             </span>
           )}
