@@ -468,7 +468,8 @@ export const ceCourses: Course[] = [
     term: "spring",
     row: 1,
     prereqs: ["ece-331-333", "ece-351"],
-    offered: "both",
+    offered: "spring",
+    note: "Spring only",
   },
   {
     id: "ece-452",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAutoHideScrollbar } from "../hooks/useAutoHideScrollbar";
 import { useTrackContext } from "../context/TrackContext";
 import type { PlannerSemester, Term } from "../types";
@@ -36,8 +36,17 @@ export function PlannerPanel({
   const { courseMap } = useTrackContext().track.catalog;
   const residencyRequired = planner.residencyRequired;
 
+  // Desktop drag state
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  // Touch / long-press drag state
+  const [touchDragIndex, setTouchDragIndex] = useState<number | null>(null);
+  const [touchDropIndex, setTouchDropIndex] = useState<number | null>(null);
+  const touchDragActiveRef = useRef(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
   const panelScrollRef = useAutoHideScrollbar<HTMLElement>();
 
   const globalTotals = planner.sumCredits(allChosenIds);
@@ -74,6 +83,78 @@ export function PlannerPanel({
     return Boolean(el.closest("input, button, .btn-icon"));
   };
 
+  // Non-passive touchmove listener attached to document while touch-drag is active,
+  // so we can call preventDefault() to suppress scroll during drag.
+  const handleDocTouchMove = useCallback((e: TouchEvent) => {
+    if (!touchDragActiveRef.current) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!el) return;
+    const boxEl = el.closest<HTMLElement>("[data-sem-index]");
+    if (boxEl) {
+      const idx = parseInt(boxEl.dataset.semIndex ?? "", 10);
+      if (!isNaN(idx)) setTouchDropIndex(idx);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener("touchmove", handleDocTouchMove, {
+      passive: false,
+    });
+    return () =>
+      document.removeEventListener("touchmove", handleDocTouchMove);
+  }, [handleDocTouchMove]);
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchStart = (index: number, e: React.TouchEvent) => {
+    // Don't interfere with taps on the ×-remove button
+    if ((e.target as HTMLElement).closest(".btn-icon")) return;
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+    longPressTimerRef.current = setTimeout(() => {
+      touchDragActiveRef.current = true;
+      // Blur any focused input so the keyboard closes during drag
+      (document.activeElement as HTMLElement | null)?.blur();
+      if (navigator.vibrate) navigator.vibrate(40);
+      setTouchDragIndex(index);
+      setTouchDropIndex(index);
+    }, 450);
+  };
+
+  const handleTouchMovePre = (e: React.TouchEvent) => {
+    if (touchDragActiveRef.current) return; // handled by document listener
+    if (!touchStartPosRef.current) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartPosRef.current.x;
+    const dy = touch.clientY - touchStartPosRef.current.y;
+    if (Math.sqrt(dx * dx + dy * dy) > 8) cancelLongPress();
+  };
+
+  const handleTouchEnd = () => {
+    cancelLongPress();
+    if (
+      touchDragActiveRef.current &&
+      touchDragIndex !== null &&
+      touchDropIndex !== null &&
+      touchDragIndex !== touchDropIndex
+    ) {
+      onReorderSemesters(touchDragIndex, touchDropIndex);
+    }
+    touchDragActiveRef.current = false;
+    setTouchDragIndex(null);
+    setTouchDropIndex(null);
+    touchStartPosRef.current = null;
+  };
+
   return (
     <aside ref={panelScrollRef} className="planner-panel auto-hide-scrollbar">
       <header className="planner-header">
@@ -86,8 +167,8 @@ export function PlannerPanel({
       </header>
 
       <p className="planner-help">
-        Drag a semester box to reorder. Select one, then click courses on the
-        chart.
+        Drag a semester box to reorder (long-press on mobile). Select one, then
+        click courses on the chart.
       </p>
 
       <div className="semester-boxes">
@@ -95,14 +176,19 @@ export function PlannerPanel({
           const isActive = sem.id === activeSemesterId;
           const chosen = sem.slots.map((s) => s.chosenId);
           const boxTotals = planner.sumCredits(chosen);
-          const isDragging = dragIndex === index;
+          const isDragging =
+            dragIndex === index || touchDragIndex === index;
           const isDropTarget =
-            dropIndex === index && dragIndex !== null && dragIndex !== index;
+            (dropIndex === index && dragIndex !== null && dragIndex !== index) ||
+            (touchDropIndex === index &&
+              touchDragIndex !== null &&
+              touchDragIndex !== index);
 
           return (
             <div
               key={sem.id}
-              className={`semester-box ${isActive ? "active" : ""} ${isDragging ? "dragging" : ""} ${isDropTarget ? "drop-target" : ""}`}
+              data-sem-index={index}
+              className={`semester-box ${isActive ? "active" : ""} ${isDragging ? "dragging" : ""} ${isDropTarget ? "drop-target" : ""} ${touchDragIndex === index ? "touch-dragging" : ""}`}
               draggable
               onDragStart={(e) => {
                 if (isDragHandleTarget(e.target)) {
@@ -115,6 +201,11 @@ export function PlannerPanel({
               onDragOver={(e) => handleDragOver(e, index)}
               onDrop={() => handleDrop(index)}
               onDragEnd={handleDragEnd}
+              onTouchStart={(e) => handleTouchStart(index, e)}
+              onTouchMove={handleTouchMovePre}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+              onContextMenu={(e) => e.preventDefault()}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
