@@ -5,6 +5,7 @@ import type { PendingOverride } from "./components/CourseSlot";
 import { ElectivesPanel } from "./components/ElectivesPanel";
 import { PlannerPanel } from "./components/PlannerPanel";
 import { ResizablePanel } from "./components/ResizablePanel";
+import { ScenarioTabs } from "./components/ScenarioTabs";
 import { TrackProvider } from "./context/TrackContext";
 import type { DegreeTrack } from "./data/tracks";
 import { getTrack, TRACK_ORDER } from "./data/tracks";
@@ -68,6 +69,25 @@ function AppContent({
   const [viewportWidth, setViewportWidth] = useState(
     () => (typeof window !== "undefined" ? window.innerWidth : 1200),
   );
+  const [mobilePlannerOpen, setMobilePlannerOpen] = useState(false);
+  const [mobileElectivesOpen, setMobileElectivesOpen] = useState(false);
+  const isMobile = viewportWidth <= 768;
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobilePlannerOpen(false);
+      setMobileElectivesOpen(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (isMobile && (mobilePlannerOpen || mobileElectivesOpen)) {
+      document.body.classList.add("drawer-open");
+    } else {
+      document.body.classList.remove("drawer-open");
+    }
+    return () => document.body.classList.remove("drawer-open");
+  }, [isMobile, mobilePlannerOpen, mobileElectivesOpen]);
 
   useEffect(() => {
     const onResize = () => {
@@ -371,9 +391,57 @@ function AppContent({
             Rutgers ECE {track.label} curriculum
           </a>
         </p>
+        <ScenarioTabs
+          scenarios={scenarios}
+          activeScenarioId={activeScenarioId}
+          onSwitchScenario={switchScenario}
+          onAddScenario={addScenario}
+          onRemoveScenario={removeScenario}
+          onRenameScenario={renameScenario}
+        />
       </header>
 
-      <main className="app-main">
+      {isMobile && (
+        <div className="mobile-toolbar">
+          <button
+            type="button"
+            className={`mobile-toggle${mobilePlannerOpen ? " mobile-toggle--active" : ""}`}
+            onClick={() => {
+              setMobilePlannerOpen((v) => !v);
+              setMobileElectivesOpen(false);
+            }}
+            aria-pressed={mobilePlannerOpen}
+          >
+            Planner
+          </button>
+          <button
+            type="button"
+            className={`mobile-toggle${mobileElectivesOpen ? " mobile-toggle--active" : ""}`}
+            onClick={() => {
+              setMobileElectivesOpen((v) => !v);
+              setMobilePlannerOpen(false);
+            }}
+            aria-pressed={mobileElectivesOpen}
+          >
+            Electives
+          </button>
+        </div>
+      )}
+
+      <main
+        className={`app-main${mobilePlannerOpen ? " app-main--planner-open" : ""}${mobileElectivesOpen ? " app-main--electives-open" : ""}`}
+      >
+        {isMobile && (mobilePlannerOpen || mobileElectivesOpen) && (
+          <button
+            type="button"
+            className="mobile-drawer-scrim"
+            aria-label="Close panel"
+            onClick={() => {
+              setMobilePlannerOpen(false);
+              setMobileElectivesOpen(false);
+            }}
+          />
+        )}
         <div className="app-main-center">
           <Flowchart
             hoveredId={hoveredId}
@@ -419,12 +487,6 @@ function AppContent({
               canUndo={canUndo}
               onRedo={redoSemesters}
               canRedo={canRedo}
-              scenarios={scenarios}
-              activeScenarioId={activeScenarioId}
-              onSwitchScenario={switchScenario}
-              onAddScenario={addScenario}
-              onRemoveScenario={removeScenario}
-              onRenameScenario={renameScenario}
             />
           </ResizablePanel>
         </div>

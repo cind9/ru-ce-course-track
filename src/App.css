@@ -886,48 +886,58 @@ body.resizing-row .panel-resize-edge--top::after {
   -webkit-overflow-scrolling: touch;
 }
 
-/* ── Scenario tabs ──────────────────────────────────────────────────────── */
-.scenario-tabs {
+/* ── Scenario tabs (in app header) ───────────────────────────────────── */
+.scenario-tabs--top {
   display: flex;
   align-items: stretch;
-  gap: 0;
+  gap: 0.25rem;
   overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  margin: 0 -1rem;
-  padding: 0 0.5rem;
   scrollbar-width: none;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--surface);
+  margin-top: 0.75rem;
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--border);
 }
 
-.scenario-tabs::-webkit-scrollbar { display: none; }
+.scenario-tabs--top::-webkit-scrollbar { display: none; }
 
 .scenario-tab {
   display: flex;
   align-items: center;
   gap: 0.15rem;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
   flex-shrink: 0;
-  padding: 0 0.1rem;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--border) 25%, var(--surface));
+  margin-bottom: -1px;
+  padding: 0 0.25rem 0 0.6rem;
+  transition: background 0.15s;
+}
+
+.scenario-tab:hover {
+  background: var(--surface);
 }
 
 .scenario-tab--active {
-  border-bottom-color: var(--accent);
+  background: var(--surface);
+  border-color: var(--accent);
+  border-bottom: 1px solid var(--surface);
+  z-index: 1;
 }
 
 .scenario-tab-label {
   background: none;
   border: none;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--muted);
   cursor: pointer;
-  padding: 0.55rem 0.4rem 0.45rem;
+  padding: 0.5rem 0.3rem;
   white-space: nowrap;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scenario-tab--active .scenario-tab-label {
@@ -935,49 +945,169 @@ body.resizing-row .panel-resize-edge--top::after {
   font-weight: 600;
 }
 
-.scenario-tab-label:hover { color: var(--text); }
-
 .scenario-tab-close {
   background: none;
   border: none;
   color: var(--muted);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 1rem;
   line-height: 1;
-  padding: 0.1rem 0.25rem;
+  padding: 0.2rem 0.4rem;
   border-radius: 4px;
-  opacity: 0.5;
+  opacity: 0.55;
 }
 
-.scenario-tab-close:hover { opacity: 1; color: var(--text); }
+.scenario-tab-close:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
 
 .scenario-tab-input {
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--accent);
   background: none;
   border: none;
   border-bottom: 1px solid var(--accent);
   padding: 0.4rem 0.3rem;
-  width: 6rem;
+  width: 7rem;
   outline: none;
 }
 
 .scenario-tab-add {
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--accent);
+  color: var(--surface);
   border: none;
-  color: var(--muted);
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 1.1rem;
-  padding: 0.3rem 0.5rem;
-  border-radius: 4px;
-  margin-left: 0.1rem;
+  padding: 0.4rem 0.7rem;
+  margin: 0 0 -1px 0.25rem;
   align-self: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.scenario-tab-add:hover {
+  filter: brightness(1.08);
+}
+
+.scenario-tab-add-icon {
+  font-size: 1.05rem;
   line-height: 1;
 }
 
-.scenario-tab-add:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+@media (max-width: 640px) {
+  .scenario-tab-add-text { display: none; }
+  .scenario-tab-add { padding: 0.4rem 0.55rem; }
+  .scenario-tab-label { font-size: 0.78rem; padding: 0.45rem 0.25rem; max-width: 8rem; }
+}
+
+/* ── Mobile toolbar + drawer ──────────────────────────────────────────── */
+.mobile-toolbar {
+  display: none;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 8;
+}
+
+.mobile-toggle {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mobile-toggle--active {
+  background: var(--accent);
+  color: var(--surface);
+  border-color: var(--accent);
+}
+
+.mobile-drawer-scrim {
+  display: none;
+}
+
+body.drawer-open {
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .mobile-toolbar { display: flex; }
+
+  .mobile-drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    border: none;
+    padding: 0;
+    z-index: 40;
+    cursor: pointer;
+  }
+
+  /* Planner becomes a right-side drawer on mobile */
+  .app-main-center > .planner-panel-wrap {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: min(85vw, 360px) !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 100vh !important;
+    z-index: 50;
+    background: var(--surface);
+    box-shadow: -4px 0 18px rgba(0, 0, 0, 0.18);
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+  }
+
+  .app-main--planner-open .app-main-center > .planner-panel-wrap {
+    transform: translateX(0);
+  }
+
+  /* Electives becomes a bottom-sheet drawer on mobile */
+  .app-main > .electives-panel-wrap {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    height: min(70vh, 480px) !important;
+    min-height: 0 !important;
+    max-height: 70vh !important;
+    z-index: 50;
+    background: var(--surface);
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
+    transform: translateY(100%);
+    transition: transform 0.22s ease;
+  }
+
+  .app-main--electives-open > .electives-panel-wrap {
+    transform: translateY(0);
+  }
+
+  /* Hide the resize handles on mobile (drawer is fixed-size) */
+  .panel-resize-edge { display: none; }
+
+  /* Flowchart gets full width — no more sticky right panel */
+  .app-main-center { overflow-x: auto; }
+  .app-main-center > .planner-panel-wrap { position: fixed; } /* override 1024px rule */
+}
 
 .planner-header {
   display: flex;

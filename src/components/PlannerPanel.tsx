@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAutoHideScrollbar } from "../hooks/useAutoHideScrollbar";
 import { useTrackContext } from "../context/TrackContext";
-import type { PlannerSemester, PlanScenario, Term } from "../types";
+import type { PlannerSemester, Term } from "../types";
 
 interface PlannerPanelProps {
   semesters: PlannerSemester[];
@@ -20,12 +20,6 @@ interface PlannerPanelProps {
   canUndo: boolean;
   onRedo: () => void;
   canRedo: boolean;
-  scenarios: PlanScenario[];
-  activeScenarioId: string;
-  onSwitchScenario: (id: string) => void;
-  onAddScenario: () => void;
-  onRemoveScenario: (id: string) => void;
-  onRenameScenario: (id: string, name: string) => void;
 }
 
 export function PlannerPanel({
@@ -45,14 +39,7 @@ export function PlannerPanel({
   canUndo,
   onRedo,
   canRedo,
-  scenarios,
-  activeScenarioId,
-  onSwitchScenario,
-  onAddScenario,
-  onRemoveScenario,
-  onRenameScenario,
 }: PlannerPanelProps) {
-  const [editingScenarioId, setEditingScenarioId] = useState<string | null>(null);
   const { planner } = useTrackContext();
   const { courseMap } = useTrackContext().track.catalog;
   const residencyRequired = planner.residencyRequired;
@@ -178,76 +165,6 @@ export function PlannerPanel({
 
   return (
     <aside ref={panelScrollRef} className="planner-panel auto-hide-scrollbar">
-
-      {/* ── Scenario tab bar ── */}
-      <div className="scenario-tabs" role="tablist" aria-label="Plan scenarios">
-        {scenarios.map((sc) => {
-          const isActive = sc.id === activeScenarioId;
-          const isEditing = editingScenarioId === sc.id;
-          return (
-            <div
-              key={sc.id}
-              className={`scenario-tab${isActive ? " scenario-tab--active" : ""}`}
-              role="tab"
-              aria-selected={isActive}
-            >
-              {isEditing ? (
-                <input
-                  className="scenario-tab-input"
-                  defaultValue={sc.name}
-                  autoFocus
-                  onBlur={(e) => {
-                    const v = e.target.value.trim();
-                    if (v) onRenameScenario(sc.id, v);
-                    setEditingScenarioId(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                    if (e.key === "Escape") setEditingScenarioId(null);
-                    e.stopPropagation();
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <button
-                  type="button"
-                  className="scenario-tab-label"
-                  onClick={() => onSwitchScenario(sc.id)}
-                  onDoubleClick={(e) => {
-                    e.preventDefault();
-                    setEditingScenarioId(sc.id);
-                  }}
-                >
-                  {sc.name}
-                </button>
-              )}
-              {scenarios.length > 1 && (
-                <button
-                  type="button"
-                  className="scenario-tab-close"
-                  aria-label={`Remove ${sc.name}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveScenario(sc.id);
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          );
-        })}
-        <button
-          type="button"
-          className="scenario-tab-add"
-          aria-label="Add scenario"
-          onClick={onAddScenario}
-          title="New scenario"
-        >
-          +
-        </button>
-      </div>
-
       <header className="planner-header">
         <div>
           <h2>Semester planner</h2>
