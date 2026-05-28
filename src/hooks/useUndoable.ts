@@ -50,5 +50,13 @@ export function useUndoable<T>(initial: T) {
     });
   }, []);
 
-  return [state, set, undo, redo, counts.past > 0, counts.future > 0] as const;
+  /** Replace current state and wipe both history stacks (e.g. when switching scenarios). */
+  const reset = useCallback((newState: T) => {
+    pastRef.current = [];
+    futureRef.current = [];
+    setCounts({ past: 0, future: 0 });
+    setStateRaw(newState);
+  }, []);
+
+  return [state, set, undo, redo, reset, counts.past > 0, counts.future > 0] as const;
 }

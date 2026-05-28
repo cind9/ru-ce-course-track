@@ -32,3 +32,10 @@ export interface PlannerSemester {
   term: Term;
   slots: PlannedSlot[];
 }
+
+export interface PlanScenario {
+  id: string;
+  name: string;
+  semesters: PlannerSemester[];
+  activeSemesterId: string;
+}

@@ -8,9 +8,11 @@ import { ResizablePanel } from "./components/ResizablePanel";
 import { TrackProvider } from "./context/TrackContext";
 import type { DegreeTrack } from "./data/tracks";
 import { getTrack, TRACK_ORDER } from "./data/tracks";
-import type { PlannerSemester, Term } from "./types";
+import type { PlannerSemester, PlanScenario, Term } from "./types";
 import {
   defaultPersistedPlan,
+  defaultScenario,
+  defaultSemesters,
   loadActiveTrack,
   loadPersistedPlan,
   saveActiveTrack,
@@ -39,11 +41,16 @@ function AppContent({
   initialPlan: PersistedPlan;
 }) {
   const { track, planner } = useTrackContext();
-  const [semesters, setSemesters, undoSemesters, redoSemesters, canUndo, canRedo] =
-    useUndoable<PlannerSemester[]>(initialPlan.semesters);
-  const [activeSemesterId, setActiveSemesterId] = useState(
-    initialPlan.activeSemesterId,
-  );
+
+  // ── Scenario state ──────────────────────────────────────────────────────────
+  const [scenarios, setScenarios] = useState<PlanScenario[]>(initialPlan.scenarios);
+  const [activeScenarioId, setActiveScenarioId] = useState(initialPlan.activeScenarioId);
+
+  const activeScenario = scenarios.find((s) => s.id === activeScenarioId) ?? scenarios[0];
+
+  const [semesters, setSemesters, undoSemesters, redoSemesters, resetSemesters, canUndo, canRedo] =
+    useUndoable<PlannerSemester[]>(activeScenario.semesters);
+  const [activeSemesterId, setActiveSemesterId] = useState(activeScenario.activeSemesterId);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [availableTerm, setAvailableTerm] = useState<Term>(
     initialPlan.availableTerm,
@@ -111,20 +118,18 @@ function AppContent({
 
   const currentPlan = useMemo(
     (): PersistedPlan => ({
-      version: 2,
-      semesters,
-      activeSemesterId,
+      version: 3,
+      scenarios: scenarios.map((s) =>
+        s.id === activeScenarioId
+          ? { ...s, semesters, activeSemesterId }
+          : s,
+      ),
+      activeScenarioId,
       availableTerm,
       plannerWidth,
       electivesHeight,
     }),
-    [
-      semesters,
-      activeSemesterId,
-      availableTerm,
-      plannerWidth,
-      electivesHeight,
-    ],
+    [scenarios, activeScenarioId, semesters, activeSemesterId, availableTerm, plannerWidth, electivesHeight],
   );
 
   useEffect(() => {
@@ -166,6 +171,60 @@ function AppContent({
     return ids;
   }, [planner, semesters]);
 
+  // ── Scenario handlers ───────────────────────────────────────────────────────
+  const switchScenario = useCallback(
+    (id: string) => {
+      if (id === activeScenarioId) return;
+      // Flush current semesters into scenarios before switching
+      setScenarios((prev) =>
+        prev.map((s) =>
+          s.id === activeScenarioId ? { ...s, semesters, activeSemesterId } : s,
+        ),
+      );
+      const target = scenarios.find((s) => s.id === id);
+      if (!target) return;
+      setActiveScenarioId(id);
+      resetSemesters(target.semesters);
+      setActiveSemesterId(target.activeSemesterId);
+    },
+    [activeScenarioId, scenarios, semesters, activeSemesterId, resetSemesters],
+  );
+
+  const addScenario = useCallback(() => {
+    // Flush current first
+    setScenarios((prev) =>
+      prev.map((s) =>
+        s.id === activeScenarioId ? { ...s, semesters, activeSemesterId } : s,
+      ),
+    );
+    const n = scenarios.length + 1;
+    const scenario = defaultScenario(`Plan ${n}`);
+    setScenarios((prev) => [...prev, scenario]);
+    setActiveScenarioId(scenario.id);
+    resetSemesters(scenario.semesters);
+    setActiveSemesterId(scenario.activeSemesterId);
+  }, [activeScenarioId, scenarios, semesters, activeSemesterId, resetSemesters]);
+
+  const removeScenario = useCallback(
+    (id: string) => {
+      if (scenarios.length <= 1) return;
+      const next = scenarios.filter((s) => s.id !== id);
+      setScenarios(next);
+      if (id === activeScenarioId) {
+        const target = next[0];
+        setActiveScenarioId(target.id);
+        resetSemesters(target.semesters);
+        setActiveSemesterId(target.activeSemesterId);
+      }
+    },
+    [scenarios, activeScenarioId, resetSemesters],
+  );
+
+  const renameScenario = useCallback((id: string, name: string) => {
+    setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+  }, []);
+
+  // ── Semester handlers ────────────────────────────────────────────────────────
   const addSlotToActiveSemester = useCallback(
     (slotId: string, chosenId: string, overridden = false) => {
       setSemesters((prev) =>
@@ -277,8 +336,7 @@ function AppContent({
   const removeSemester = (id: string) => {
     setSemesters((prev) => {
       const next = prev.filter((s) => s.id !== id);
-      const final =
-        next.length > 0 ? next : defaultPersistedPlan().semesters;
+      const final = next.length > 0 ? next : defaultSemesters();
       if (activeSemesterId === id) {
         setActiveSemesterId(final[0].id);
       }
@@ -361,6 +419,12 @@ function AppContent({
               canUndo={canUndo}
               onRedo={redoSemesters}
               canRedo={canRedo}
+              scenarios={scenarios}
+              activeScenarioId={activeScenarioId}
+              onSwitchScenario={switchScenario}
+              onAddScenario={addScenario}
+              onRemoveScenario={removeScenario}
+              onRenameScenario={renameScenario}
             />
           </ResizablePanel>
         </div>
